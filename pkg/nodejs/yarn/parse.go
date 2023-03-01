@@ -261,6 +261,8 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 	scanner := bufio.NewScanner(r)
 	scanner.Split(scanBlocks)
 	dependsOn := map[string][]string{}
+	indirectMap := map[string]bool{}
+
 	for scanner.Scan() {
 		block := scanner.Bytes()
 		lib, deps, newLine, err := parseBlock(block, lineNumber)
@@ -269,6 +271,12 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 			return nil, nil, err
 		} else if lib.Name == "" {
 			continue
+		}
+
+		for _, dep := range deps {
+			if _, ok := indirectMap[dep]; !ok {
+				indirectMap[dep] = true
+			}
 		}
 
 		libID := utils.PackageID(lib.Name, lib.Version)
@@ -297,5 +305,11 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 	// Replace dependency patterns with library IDs
 	// e.g. ajv@^6.5.5 => ajv@6.10.0
 	deps := parseResults(patternIDs, dependsOn)
+
+	for _, lib := range libs {
+		_, ok := indirectMap[lib.ID]
+		lib.Indirect = ok
+	}
+
 	return libs, deps, nil
 }
