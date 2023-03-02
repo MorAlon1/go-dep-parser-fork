@@ -44,7 +44,6 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 	}
 
 	libs := make([]types.Library, 0)
-	indirectMap := map[string]bool{}
 	depsMap := make(map[string][]string)
 	for _, targetContent := range lockFile.Targets {
 		for packageName, packageContent := range targetContent {
@@ -56,9 +55,10 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 			depId := utils.PackageID(packageName, packageContent.Resolved)
 
 			lib := types.Library{
-				ID:      depId,
-				Name:    packageName,
-				Version: packageContent.Resolved,
+				ID:       depId,
+				Name:     packageName,
+				Version:  packageContent.Resolved,
+				Indirect: packageContent.Type != "Direct",
 				Locations: []types.Location{
 					{
 						StartLine: packageContent.StartLine,
@@ -78,12 +78,6 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 				dependsOn = utils.UniqueStrings(append(dependsOn, savedDependsOn...))
 			}
 
-			for _, dep := range dependsOn {
-				if _, ok := indirectMap[dep]; !ok {
-					indirectMap[dep] = true
-				}
-			}
-
 			if len(dependsOn) > 0 {
 				depsMap[depId] = dependsOn
 			}
@@ -97,11 +91,6 @@ func (p *Parser) Parse(r dio.ReadSeekerAt) ([]types.Library, []types.Dependency,
 			DependsOn: dependsOn,
 		}
 		deps = append(deps, dep)
-	}
-
-	for _, lib := range libs {
-		_, ok := indirectMap[lib.ID]
-		lib.Indirect = ok
 	}
 
 	return utils.UniqueLibraries(libs), deps, nil
